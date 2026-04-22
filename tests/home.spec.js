@@ -81,6 +81,17 @@ test.describe("Missing Scientists static site", () => {
     expect(apexHttp.status()).toBe(308);
     expect(apexHttp.headers().location).toBe("https://missingscientists.lol/");
 
+    const apexForwardedAsHttpsOnPort80 = await request.get("/from-nginx", {
+      headers: {
+        Host: "missingscientists.lol",
+        "X-Forwarded-Port": "80",
+        "X-Forwarded-Proto": "https"
+      },
+      maxRedirects: 0
+    });
+    expect(apexForwardedAsHttpsOnPort80.status()).toBe(308);
+    expect(apexForwardedAsHttpsOnPort80.headers().location).toBe("https://missingscientists.lol/from-nginx");
+
     const wwwHttps = await request.get("/?case=gray", {
       headers: {
         Host: "www.missingscientists.lol",

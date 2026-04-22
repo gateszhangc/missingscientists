@@ -75,7 +75,7 @@ jobs:
           image_pattern = rf"(-\s*name:\s*{re.escape(image_name)}\s*\n(?:\s+.*\n)*?\s*newTag:\s*).*$"
           updated, count = re.subn(
               image_pattern,
-              rf"\1{os.environ['IMAGE_TAG']}",
+              lambda match: f"{match.group(1)}{os.environ['IMAGE_TAG']}",
               content,
               count=1,
               flags=re.MULTILINE,

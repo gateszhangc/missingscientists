@@ -56,7 +56,8 @@ const productionRedirectLocation = (request, url) => {
   }
 
   const forwardedProto = firstHeaderValue(request.headers["x-forwarded-proto"]).toLowerCase();
-  if (requestHost === canonicalHost && forwardedProto === "https") {
+  const forwardedPort = firstHeaderValue(request.headers["x-forwarded-port"]);
+  if (requestHost === canonicalHost && forwardedProto === "https" && forwardedPort !== "80") {
     return null;
   }
 
