@@ -70,6 +70,37 @@ test.describe("Missing Scientists static site", () => {
     expect(await sitemap.text()).toContain("<loc>https://missingscientists.lol/</loc>");
   });
 
+  test("production hosts redirect canonically without blocking ACME probes", async ({ request }) => {
+    const apexHttp = await request.get("/", {
+      headers: {
+        Host: "missingscientists.lol",
+        "X-Forwarded-Proto": "http"
+      },
+      maxRedirects: 0
+    });
+    expect(apexHttp.status()).toBe(308);
+    expect(apexHttp.headers().location).toBe("https://missingscientists.lol/");
+
+    const wwwHttps = await request.get("/?case=gray", {
+      headers: {
+        Host: "www.missingscientists.lol",
+        "X-Forwarded-Proto": "https"
+      },
+      maxRedirects: 0
+    });
+    expect(wwwHttps.status()).toBe(308);
+    expect(wwwHttps.headers().location).toBe("https://missingscientists.lol/?case=gray");
+
+    const challenge = await request.get("/.well-known/acme-challenge/token", {
+      headers: {
+        Host: "missingscientists.lol",
+        "X-Forwarded-Proto": "http"
+      },
+      maxRedirects: 0
+    });
+    expect(challenge.status()).not.toBe(308);
+  });
+
   test("health check responds for deployment probes", async ({ request }) => {
     const response = await request.get("/healthz");
     expect(response.ok()).toBe(true);

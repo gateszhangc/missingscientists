@@ -22,9 +22,45 @@ const contentTypes = {
   ".xml": "application/xml; charset=utf-8"
 };
 
+const canonicalHost = "missingscientists.lol";
+const wwwHost = `www.${canonicalHost}`;
+
 const send = (response, statusCode, headers, body) => {
   response.writeHead(statusCode, headers);
   response.end(body);
+};
+
+const redirect = (response, location) => {
+  send(
+    response,
+    308,
+    {
+      "Cache-Control": "no-cache",
+      "Content-Type": "text/plain; charset=utf-8",
+      Location: location
+    },
+    "Permanent Redirect"
+  );
+};
+
+const firstHeaderValue = (value) => String(value || "").split(",")[0].trim();
+
+const productionRedirectLocation = (request, url) => {
+  if (url.pathname.startsWith("/.well-known/acme-challenge/")) {
+    return null;
+  }
+
+  const requestHost = firstHeaderValue(request.headers.host).split(":")[0].toLowerCase();
+  if (requestHost !== canonicalHost && requestHost !== wwwHost) {
+    return null;
+  }
+
+  const forwardedProto = firstHeaderValue(request.headers["x-forwarded-proto"]).toLowerCase();
+  if (requestHost === canonicalHost && forwardedProto === "https") {
+    return null;
+  }
+
+  return `https://${canonicalHost}${url.pathname}${url.search}`;
 };
 
 const serveFile = (requestPath, response) => {
@@ -66,6 +102,13 @@ const serveFile = (requestPath, response) => {
 
 const server = http.createServer((request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+  const redirectLocation = productionRedirectLocation(request, url);
+
+  if (redirectLocation) {
+    redirect(response, redirectLocation);
+    return;
+  }
+
   let pathname = decodeURIComponent(url.pathname);
 
   if (pathname === "/healthz") {
