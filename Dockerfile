@@ -9,7 +9,6 @@ ENV HOSTNAME=0.0.0.0
 COPY assets ./assets
 COPY index.html ./index.html
 COPY robots.txt ./robots.txt
-COPY script.js ./script.js
 COPY server.js ./server.js
 COPY site.webmanifest ./site.webmanifest
 COPY sitemap.xml ./sitemap.xml

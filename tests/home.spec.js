@@ -1,28 +1,34 @@
 const { test, expect } = require("@playwright/test");
 
-test.describe("Artemis II wallpaper site", () => {
-  test("desktop homepage renders key content and filters wallpapers", async ({ page }) => {
+test.describe("Missing Scientists static site", () => {
+  test("desktop homepage renders source-led archive content", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page).toHaveTitle(/Artemis II Wallpaper/i);
-    await expect(page.locator("h1")).toHaveText("Artemis II Wallpaper");
-    await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /publicly released NASA mission imagery/i);
-    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://artemis-2-wallpaper.lol/");
+    await expect(page).toHaveTitle(/Verified Cases, Timelines, and Source Trails/i);
+    await expect(page.locator("h1")).toHaveText("Missing Scientists");
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /source-led archive/i);
+    await expect(page.locator('meta[name="keywords"]')).toHaveAttribute("content", /Jim Gray/i);
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#243b3c");
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /max-image-preview:large/i);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://missingscientists.lol/");
+    await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute("content", /editorial cover image/i);
 
-    const wallpaperCards = page.locator(".wallpaper-card");
-    await expect(wallpaperCards).toHaveCount(10);
-    await expect(page.getByText("Not an official NASA website.")).toBeVisible();
+    await expect(page.locator(".case-card")).toHaveCount(4);
+    await expect(page.getByRole("heading", { name: "Ettore Majorana" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Carl R. Disch" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Vladimir Alexandrov" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Jim Gray" })).toBeVisible();
+    await expect(page.locator(".sources a")).toHaveCount(7);
+    await expect(page.getByText("unsupported claims")).toBeVisible();
+    await expect(page.getByText("independent source-led archive")).toBeVisible();
 
-    await page.getByRole("button", { name: "Posters" }).click();
-    await expect(page.locator(".wallpaper-card:not([hidden])")).toHaveCount(2);
-    await expect(page.locator("[data-results-count]")).toHaveText("Showing 2 wallpapers");
+    await page.getByRole("link", { name: "Review cases" }).click();
+    await expect(page.locator("#cases")).toBeInViewport();
 
-    await page.getByRole("button", { name: "All" }).click();
-    await expect(page.locator(".wallpaper-card:not([hidden])")).toHaveCount(10);
-
-    for (const image of await page.locator("img").all()) {
-      await image.scrollIntoViewIfNeeded();
-    }
+    const structuredData = await page.locator('script[type="application/ld+json"]').allInnerTexts();
+    expect(structuredData.join("\n")).toContain('"@type": "WebSite"');
+    expect(structuredData.join("\n")).toContain('"@type": "CollectionPage"');
+    expect(structuredData.join("\n")).toContain('"name": "Jim Gray"');
 
     const imagesLoaded = await page.evaluate(() =>
       Array.from(document.images).every((image) => image.complete && image.naturalWidth > 0)
@@ -30,7 +36,7 @@ test.describe("Artemis II wallpaper site", () => {
     expect(imagesLoaded).toBe(true);
   });
 
-  test("mobile layout stays within viewport and keeps gallery accessible", async ({ browser }) => {
+  test("mobile layout avoids horizontal overflow and keeps cases accessible", async ({ browser }) => {
     const context = await browser.newContext({
       viewport: { width: 390, height: 844 },
       isMobile: true
@@ -40,16 +46,34 @@ test.describe("Artemis II wallpaper site", () => {
     await page.goto("/");
 
     await expect(page.locator("h1")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Explore the Collection" })).toBeVisible();
-    await page.getByRole("link", { name: "Explore the Collection" }).click();
-    await expect(page.locator("#gallery")).toBeInViewport();
+    const casesLink = page.getByRole("navigation").getByRole("link", { name: "Cases", exact: true });
+    await expect(casesLink).toBeVisible();
+    await casesLink.click();
+    await expect(page.locator("#cases")).toBeInViewport();
 
-    const overflow = await page.evaluate(() => {
-      return document.documentElement.scrollWidth - window.innerWidth;
-    });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(1);
+    await expect(page.locator(".case-card")).toHaveCount(4);
 
-    await expect(page.locator(".wallpaper-card")).toHaveCount(10);
     await context.close();
+  });
+
+  test("crawl artifacts stay accessible for search engines", async ({ request }) => {
+    const robots = await request.get("/robots.txt");
+    expect(robots.ok()).toBe(true);
+    expect(robots.headers()["cache-control"]).toBe("no-cache");
+    expect(await robots.text()).toMatch(/Sitemap: https:\/\/missingscientists\.lol\/sitemap\.xml/);
+
+    const sitemap = await request.get("/sitemap.xml");
+    expect(sitemap.ok()).toBe(true);
+    expect(sitemap.headers()["cache-control"]).toBe("no-cache");
+    expect(await sitemap.text()).toContain("<loc>https://missingscientists.lol/</loc>");
+  });
+
+  test("health check responds for deployment probes", async ({ request }) => {
+    const response = await request.get("/healthz");
+    expect(response.ok()).toBe(true);
+    expect(response.headers()["content-type"]).toMatch(/application\/json/);
+    expect(await response.json()).toEqual({ ok: true });
   });
 });

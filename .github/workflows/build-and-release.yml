@@ -10,13 +10,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: artemis-2-wallpaper-release
+  group: missingscientists-release
   cancel-in-progress: true
 
 env:
-  IMAGE_NAME: registry.144.91.77.245.sslip.io/dokploy-fleet-artemis-2-wallpaper-artemis-2-wallpaper
+  IMAGE_NAME: registry.144.91.77.245.sslip.io/dokploy-fleet-missingscientists-missingscientists
   FLEET_REPO: gateszhangc/k8s-fleet
-  FLEET_TENANT_PATH: tenants/artemis-2-wallpaper/20-artemis-2-wallpaper-deployment.yaml
+  FLEET_KUSTOMIZATION_PATH: tenants/missingscientists/kustomization.yaml
 
 jobs:
   build-and-push:
@@ -60,7 +60,7 @@ jobs:
           token: ${{ secrets.FLEET_REPO_PAT }}
           path: k8s-fleet
 
-      - name: Update deployment image tag
+      - name: Update kustomization image tag
         env:
           IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
         run: |
@@ -69,17 +69,19 @@ jobs:
           import re
           from pathlib import Path
 
-          path = Path("k8s-fleet") / os.environ["FLEET_TENANT_PATH"]
+          path = Path("k8s-fleet") / os.environ["FLEET_KUSTOMIZATION_PATH"]
           content = path.read_text()
+          image_name = os.environ["IMAGE_NAME"]
+          image_pattern = rf"(-\s*name:\s*{re.escape(image_name)}\s*\n(?:\s+.*\n)*?\s*newTag:\s*).*$"
           updated, count = re.subn(
-              r"(^\s*image:\s*registry\.144\.91\.77\.245\.sslip\.io/dokploy-fleet-artemis-2-wallpaper-artemis-2-wallpaper:).*$",
+              image_pattern,
               rf"\1{os.environ['IMAGE_TAG']}",
               content,
               count=1,
               flags=re.MULTILINE,
           )
           if count != 1:
-              raise SystemExit("Expected exactly one image line to update in the fleet deployment manifest.")
+              raise SystemExit("Expected exactly one image block to update in the fleet kustomization.")
           path.write_text(updated)
           PY
 
@@ -90,9 +92,9 @@ jobs:
           cd k8s-fleet
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$FLEET_TENANT_PATH"
+          git add "$FLEET_KUSTOMIZATION_PATH"
           if git diff --cached --quiet; then
             exit 0
           fi
-          git commit -m "chore: release artemis-2-wallpaper ${IMAGE_TAG}"
+          git commit -m "chore: release missingscientists ${IMAGE_TAG}"
           git push origin HEAD:main
